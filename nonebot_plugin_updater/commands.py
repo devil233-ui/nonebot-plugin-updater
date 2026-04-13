@@ -18,6 +18,36 @@ from .utils.common import (
 from .utils.models import NBPluginMetadata, PluginInfo
 from .utils.updater import Updater
 
+import json
+import os
+from nonebot.adapters import Bot, Event
+
+def _save_restart_state(bot: Bot, event: Event, message: str) -> None:
+    """保存重启前的信息到临时文件"""
+    try:
+        # 获取 OneBot V11 的事件信息
+        session_id = event.get_session_id()
+        is_group = session_id.startswith("group_")
+        
+        # 提取群号或私聊 QQ 号
+        if is_group:
+            target_id = session_id.split("_")[1]
+        else:
+            target_id = event.get_user_id()
+
+        info = {
+            'bot_id': bot.self_id,
+            'is_group': is_group,
+            'target_id': target_id,
+            'message': message
+        }
+        
+        with open('.restart_info.json', 'w', encoding='utf-8') as f:
+            json.dump(info, f, ensure_ascii=False)
+    except Exception as e:
+        from nonebot import logger
+        logger.error(f"保存重启状态失败: {e}")
+        
 require('nonebot_plugin_alconna')
 from nonebot_plugin_alconna import (
     Alconna,
@@ -172,8 +202,13 @@ async def _(
 
 @close_nb.handle()
 async def _() -> None:
-    await close_nb.send('关闭nb中……')
-    await Updater.do_stop()
+    from nonebot import logger
+    import os
+    import sys
+
+    logger.warning("收到关闭指令，正在执行强制断电...")
+    # 发送终极无情退出信号，不管有没有后台任务，当场暴毙
+    os._exit(0)
 
 
 @restart_nb.handle()
